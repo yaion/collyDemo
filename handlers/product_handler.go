@@ -1,0 +1,81 @@
+package handlers
+
+import (
+	"collyDemo/core"
+	"collyDemo/mongodb"
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+
+	"github.com/gocolly/colly/v2"
+)
+
+type ProductResult struct {
+	IsAuthority bool               `json:"is_authority"`
+	Items       []*mongodb.Product `json:"items"`
+	Pagination  Pagination         `json:"pagination"`
+	Sort        Sort               `json:"sort"`
+}
+
+func ProductHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) error {
+	str, err := Handler(r)
+	if err != nil {
+		return err
+	}
+	result := new(ProductResult)
+	err = json.Unmarshal([]byte(str), result)
+	if err != nil {
+		return err
+	}
+	if result.IsAuthority == false {
+		return nil
+	}
+	client := mongodb.GetMongo()
+	db := client.Database("kaogujia")
+	dao := mongodb.NewProductDAO(db)
+	var docs []interface{}
+	for _, author := range result.Items {
+		docs = append(docs, author)
+	}
+	err = dao.BatchCreate(context.Background(), docs)
+	if err != nil {
+		log.Printf("Create author error: %v", err)
+		return err
+	}
+	headers := map[string]string{
+		"accept":             "*/*",
+		"accept-language":    "zh-HK,zh-CN;q=0.9,zh;q=0.8,zh-TW;q=0.7",
+		"authorization":      acc.Token,
+		"origin":             "https://www.kaogujia.com",
+		"priority":           "u=1, i",
+		"referer":            "https://www.kaogujia.com/",
+		"sec-ch-ua":          `"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"`,
+		"sec-ch-ua-mobile":   "?0",
+		"sec-ch-ua-platform": `"Windows"`,
+		"sec-fetch-dest":     "empty",
+		"sec-fetch-mode":     "cors",
+		"sec-fetch-site":     "same-site",
+		"user-agent":         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+		"version_code":       "3.1",
+		"content-type":       "application/json",
+	}
+	if result.Pagination.TotalCount > result.Pagination.Page*result.Pagination.Limit {
+		// 创建任务
+		listTask := &core.Task{
+			URL:     fmt.Sprintf("https://service.kaogujia.com/api/sku/search?limit=%v&page=%v&sort_field=sales&sort=0", result.Pagination.Limit, result.Pagination.Page+1),
+			Method:  "POST",
+			Headers: headers,
+			Body:    []byte(`{"pub_time":{"min":"20250629","max":"20250705"},"keyword":"","keyword_type":1}`),
+			Handler: ProductHandler,
+			Meta: map[string]interface{}{
+				"page":     1,
+				"pageSize": 50,
+			},
+		}
+		d.AddTask(listTask)
+	}
+	// todo 创建info任务
+
+	return nil
+}
