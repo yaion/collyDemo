@@ -13,7 +13,7 @@ var MongoClient *mongo.Client
 
 func InitMongo() error {
 
-	clientOptions := options.Client().ApplyURI("mongodb://192.168.232.133:27017")
+	clientOptions := options.Client().ApplyURI("mongodb://127.0.0.1:27017")
 
 	// 连接 MongoDB（带超时控制）
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

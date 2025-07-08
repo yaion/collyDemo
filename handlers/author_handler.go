@@ -3,6 +3,7 @@ package handlers
 import (
 	"collyDemo/core"
 	"collyDemo/mongodb"
+	"collyDemo/pkg/utils"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -26,6 +27,8 @@ func AuthorHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher)
 	result := new(AuthorResult)
 	err = json.Unmarshal([]byte(str), result)
 	if err != nil {
+		log.Printf("Unmarshal error: %v,str : %v", err, str)
+		utils.WriteToFile("brand.json", str)
 		return err
 	}
 
@@ -102,6 +105,7 @@ func AuthorInfoHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatc
 	result := new(mongodb.AuthorInfo)
 	err = json.Unmarshal([]byte(str), result)
 	if err != nil {
+		log.Printf("Unmarshal error: %v,str : %v", err, str)
 		return err
 	}
 	//  插入详情数据
