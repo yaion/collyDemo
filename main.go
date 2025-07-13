@@ -4,6 +4,7 @@ import (
 	"collyDemo/core"
 	"collyDemo/handlers"
 	"collyDemo/mongodb"
+	"fmt"
 	"log"
 	"math/rand"
 	"time"
@@ -13,6 +14,7 @@ func main() {
 	// 初始化 mongo
 	mongodb.InitMongo()
 	rand.Seed(time.Now().UnixNano())
+
 	// 初始化账号池
 	accounts := []*core.Account{
 		{
@@ -85,6 +87,71 @@ func main() {
 		},
 	})
 
+	//直播达人带货榜 一天一次 todo
+	dispatcher.AddTask(&core.Task{
+		URL:     "https://service.kaogujia.com/api/rank/live/sku/author?limit=50&page=1&sort_field=gmv&sort=0",
+		Method:  "POST",
+		Headers: headers,
+		Body:    []byte(`{"sort_field":"gmv","sort":0,"limit":50,"page":1}`),
+		Handler: handlers.AuthorHandler,
+		Meta: map[string]interface{}{
+			"page":     1,
+			"pageSize": 50,
+		},
+	})
+
+	//直播达人带货榜 一天一次 todo
+	dispatcher.AddTask(&core.Task{
+		URL:     "https://service.kaogujia.com/api/rank/live/sku/author?limit=50&page=1&sort_field=gmv&sort=0",
+		Method:  "POST",
+		Headers: headers,
+		Body:    []byte(fmt.Sprintf(`{"date_code":%v,"period":1,"m_lv1":0}`, time.Now().Format("20060102"))), //{"date_code":20250712,"period":1,"m_lv1":0}
+		Handler: handlers.AuthorHandler,
+		Meta: map[string]interface{}{
+			"page":     1,
+			"pageSize": 50,
+		},
+	})
+
+	//带货达人潜力榜 一天一次 todo
+	dispatcher.AddTask(&core.Task{
+		URL:     "https://service.kaogujia.com/api/rank/author/potential?limit=50&page=1&sort_field=potential&sort=0",
+		Method:  "POST",
+		Headers: headers,
+		Body:    []byte(fmt.Sprintf(`{"date_code":%v,"period":30}`, time.Now().Format("20060102"))),
+		Handler: handlers.AuthorHandler,
+		Meta: map[string]interface{}{
+			"page":     1,
+			"pageSize": 50,
+		},
+	})
+
+	// 达人涨粉榜 一天一次 todo
+	dispatcher.AddTask(&core.Task{
+		URL:     "https://service.kaogujia.com/api/rank/author/fans/increment?limit=50&page=1&sort_field=inc_fans_count&sort=0",
+		Method:  "POST",
+		Headers: headers,
+		Body:    []byte(fmt.Sprintf(`{"type":1,"date_code":%v,"period":1,"lv1":0}`, time.Now().Format("20060102"))),
+		Handler: handlers.AuthorHandler,
+		Meta: map[string]interface{}{
+			"page":     1,
+			"pageSize": 50,
+		},
+	})
+
+	// 达人掉粉榜 一天一次 todo
+	dispatcher.AddTask(&core.Task{
+		URL:     "https://service.kaogujia.com/api/rank/author/fans/increment?limit=50&page=1&sort_field=inc_fans_count&sort=0",
+		Method:  "POST",
+		Headers: headers,
+		Body:    []byte(fmt.Sprintf(`{"type":2,"date_code":%v,"period":1,"lv1":0}`, time.Now().Format("20060102"))),
+		Handler: handlers.AuthorHandler,
+		Meta: map[string]interface{}{
+			"page":     1,
+			"pageSize": 50,
+		},
+	})
+
 	// 添加初始品牌任务
 	dispatcher.AddTask(&core.Task{
 		URL:     "https://service.kaogujia.com/api/brand/search?limit=50&page=1&sort_field=gmv&sort=0",
@@ -97,6 +164,31 @@ func main() {
 			"pageSize": 50,
 		},
 	})
+	//品牌热销榜
+	dispatcher.AddTask(&core.Task{
+		URL:     "https://service.kaogujia.com/api/rank/brand?limit=50&page=1&sort_field=gmv&sort=0",
+		Method:  "POST",
+		Headers: headers,
+		Body:    []byte(fmt.Sprintf(`{"date_code":%v,"period":1,"m_lv1":0}`, time.Now().Format("20060102"))),
+		Handler: handlers.AuthorHandler,
+		Meta: map[string]interface{}{
+			"page":     1,
+			"pageSize": 50,
+		},
+	})
+
+	//品牌声量榜
+	dispatcher.AddTask(&core.Task{
+		URL:     "https://service.kaogujia.com/api/rank/brandsov?limit=50&page=1&sort_field=expose_count&sort=0",
+		Method:  "POST",
+		Headers: headers,
+		Body:    []byte(fmt.Sprintf(`{"date_code":%v,"period":1,"m_lv1":0}`, time.Now().Format("20060102"))),
+		Handler: handlers.AuthorHandler,
+		Meta: map[string]interface{}{
+			"page":     1,
+			"pageSize": 50,
+		},
+	})
 
 	// 添加初始直播任务
 	dispatcher.AddTask(&core.Task{
@@ -104,6 +196,32 @@ func main() {
 		Method:  "POST",
 		Headers: headers,
 		Body:    []byte(`{"pub_time":{"min":"20250629","max":"20250705"},"keyword":"","keyword_type":1}`),
+		Handler: handlers.LiveHandler,
+		Meta: map[string]interface{}{
+			"page":     1,
+			"pageSize": 50,
+		},
+	})
+
+	// 带货小时榜 每小时一次 todo
+	dispatcher.AddTask(&core.Task{
+		URL:     "https://service.kaogujia.com/api/rank/official/live/sku/hour?limit=50&page=1&sort_field=score&sort=0",
+		Method:  "POST",
+		Headers: headers,
+		Body:    []byte(fmt.Sprintf(`{"date_code":%v,"hh":%v,"lv1":0,"m_lv1":0}`, time.Now().Format("20060102"), time.Now().Hour())),
+		Handler: handlers.LiveHandler,
+		Meta: map[string]interface{}{
+			"page":     1,
+			"pageSize": 50,
+		},
+	})
+
+	// 带货小时榜 每小时一次 todo
+	dispatcher.AddTask(&core.Task{
+		URL:     "https://service.kaogujia.com/api/rank/official/live/hour?limit=50&page=1&sort_field=gap_description&sort=0",
+		Method:  "POST",
+		Headers: headers,
+		Body:    []byte(fmt.Sprintf(`{"date_code":%v,"hh":%v,"lv1":0,"m_lv1":0}`, time.Now().Format("20060102"), time.Now().Hour())),
 		Handler: handlers.LiveHandler,
 		Meta: map[string]interface{}{
 			"page":     1,
@@ -124,12 +242,90 @@ func main() {
 		},
 	})
 
+	// 添加实时销量榜 todo
+	dispatcher.AddTask(&core.Task{
+		URL:     "https://service.kaogujia.com/api/rank/sku/rta?limit=50&page=1&sort_field=h2_sales&sort=0",
+		Method:  "POST",
+		Headers: headers,
+		Body:    []byte(`{"m_lv1":0}`),
+		Handler: handlers.ProductHandler,
+		Meta: map[string]interface{}{
+			"page":     1,
+			"pageSize": 50,
+		},
+	})
+
+	// 添加商品热销榜 一天一次 todo
+	dispatcher.AddTask(&core.Task{
+		URL:     "https://service.kaogujia.com/api/rank/sku/pmt/2?limit=50&page=1&sort_field=sales&sort=0",
+		Method:  "POST",
+		Headers: headers,
+		Body:    []byte(fmt.Sprintf(`{"date_code":%v,"period":1}`, time.Now().Format("20060102"))),
+		Handler: handlers.ProductHandler,
+		Meta: map[string]interface{}{
+			"page":     1,
+			"pageSize": 50,
+		},
+	})
+
+	// 直播热推榜 一天一次 todo
+	dispatcher.AddTask(&core.Task{
+		URL:     "https://service.kaogujia.com/api/rank/sku/rta?limit=50&page=1&sort_field=h2_sales&sort=0",
+		Method:  "POST",
+		Headers: headers,
+		Body:    []byte(fmt.Sprintf(`{"date_code":%v,"period":1}`, time.Now().Format("20060102"))),
+		Handler: handlers.ProductHandler,
+		Meta: map[string]interface{}{
+			"page":     1,
+			"pageSize": 50,
+		},
+	})
+
+	// 视频热推榜 一天一次 todo
+	dispatcher.AddTask(&core.Task{
+		URL:     "https://service.kaogujia.com/api/rank/video/sku/2?limit=50&page=1&sort_field=sales&sort=0",
+		Method:  "POST",
+		Headers: headers,
+		Body:    []byte(fmt.Sprintf(`{"date_code":%v,"period":1}`, time.Now().Format("20060102"))),
+		Handler: handlers.ProductHandler,
+		Meta: map[string]interface{}{
+			"page":     1,
+			"pageSize": 50,
+		},
+	})
+
 	// 添加初始店铺任务
 	dispatcher.AddTask(&core.Task{
 		URL:     "https://service.kaogujia.com/api/shop/search?limit=50&page=1&sort_field=gmv&sort=0",
 		Method:  "POST",
 		Headers: headers,
 		Body:    []byte(`{"period":1,"keyword":""}`),
+		Handler: handlers.StoreHandler,
+		Meta: map[string]interface{}{
+			"page":     1,
+			"pageSize": 50,
+		},
+	})
+
+	//热销小店榜 一天一次 todo
+	dispatcher.AddTask(&core.Task{
+		URL:     "https://service.kaogujia.com/api/rank/shop/hot?limit=50&page=1&sort_field=gmv&sort=0",
+		Method:  "POST",
+		Headers: headers,
+		Body:    []byte(fmt.Sprintf(`{"date_code":%v,"period":1,"m_lv1":0}`, time.Now().Format("20060102"))),
+		Handler: handlers.StoreHandler,
+		Meta: map[string]interface{}{
+			"page":     1,
+			"pageSize": 50,
+		},
+	})
+
+	//地区小店榜 一天一次 todo
+	dispatcher.AddTask(&core.Task{
+		URL:     "https://service.kaogujia.com/api/rank/shop/area?limit=50&page=1&sort_field=gmv&sort=0",
+		Method:  "POST",
+		Headers: headers,
+		Body:    []byte(fmt.Sprintf(`{"date_code":%v,"period":1,"city_id":0,"province_id":0}`, time.Now().Format("20060102"))),
 		Handler: handlers.StoreHandler,
 		Meta: map[string]interface{}{
 			"page":     1,
@@ -149,6 +345,46 @@ func main() {
 			"pageSize": 50,
 		},
 	})
+
+	//热门视频榜 todo
+	dispatcher.AddTask(&core.Task{
+		URL:     "https://service.kaogujia.com/api/rank/video?limit=50&page=1&sort_field=like_count&sort=0",
+		Method:  "POST",
+		Headers: headers,
+		Body:    []byte(fmt.Sprintf(`{"date_code":%v,"period":1,"hide_gov_media_vip":1,"lv1":0,"is_sku":0}`, time.Now().Format("20060102"))),
+		Handler: handlers.VideoHandler,
+		Meta: map[string]interface{}{
+			"page":     1,
+			"pageSize": 50,
+		},
+	})
+
+	//电商视频榜 todo
+	dispatcher.AddTask(&core.Task{
+		URL:     "https://service.kaogujia.com/api/rank/productvideo?limit=50&page=1&sort_field=gmv&sort=0",
+		Method:  "POST",
+		Headers: headers,
+		Body:    []byte(fmt.Sprintf(`{"date_code":%v,"period":1}`, time.Now().Format("20060102"))),
+		Handler: handlers.VideoHandler,
+		Meta: map[string]interface{}{
+			"page":     1,
+			"pageSize": 50,
+		},
+	})
+
+	//图文带货榜 todo
+	dispatcher.AddTask(&core.Task{
+		URL:     "https://service.kaogujia.com/api/rank/productvideo?limit=50&page=1&sort_field=gmv&sort=0",
+		Method:  "POST",
+		Headers: headers,
+		Body:    []byte(fmt.Sprintf(`{"is_image":1,"date_code":%v,"period":1}`, time.Now().Format("20060102"))),
+		Handler: handlers.VideoHandler,
+		Meta: map[string]interface{}{
+			"page":     1,
+			"pageSize": 50,
+		},
+	})
+
 	// 启动爬虫，设置并发数为3
 	dispatcher.Run(len(accounts))
 
