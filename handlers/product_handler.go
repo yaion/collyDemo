@@ -3,6 +3,7 @@ package handlers
 import (
 	"collyDemo/core"
 	"collyDemo/mongodb"
+	"collyDemo/pkg/utils"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -26,6 +27,8 @@ func ProductHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher
 	result := new(ProductResult)
 	err = json.Unmarshal([]byte(str), result)
 	if err != nil {
+		log.Printf("Unmarshal error: %v,str : %v", err, str)
+		utils.WriteToFile("product.json", str)
 		return err
 	}
 	if result.IsAuthority == false {

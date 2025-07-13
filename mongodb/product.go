@@ -22,7 +22,7 @@ type Stat struct {
 	Lives       interface{} `json:"lives" bson:"lives"`
 	Videos      interface{} `json:"videos" bson:"videos"`
 	ImageVideos string      `json:"image_videos" bson:"image_videos"`
-	Users       string      `json:"users" bson:"users"`
+	Users       interface{} `json:"users" bson:"users"`
 	MarketType  MarketType  `json:"market_type" bson:"market_type"`
 }
 

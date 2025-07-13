@@ -11,16 +11,16 @@ import (
 
 // Store 店铺实体
 type Store struct {
-	ShopID      string  `json:"shop_id" bson:"shop_id"` // 使用shop_id作为主键
-	Name        string  `json:"name" bson:"name"`
-	Logo        string  `json:"logo" bson:"logo"`
-	HasFlagship int     `json:"has_flagship" bson:"has_flagship"` // 0-无，1-有
-	DsrStr      string  `json:"dsr_str" bson:"dsr_str"`
-	Dsr         float64 `json:"dsr" bson:"dsr"`
-	Lv1         string  `json:"lv1" bson:"lv1"` // 一级类目
-	SkuCount    string  `json:"sku_count" bson:"sku_count"`
-	IsFollowed  bool    `json:"is_followed" bson:"is_followed"`
-	Stat        Stat    `json:"stat" bson:"stat"`
+	ShopID      string      `json:"shop_id" bson:"shop_id"` // 使用shop_id作为主键
+	Name        string      `json:"name" bson:"name"`
+	Logo        string      `json:"logo" bson:"logo"`
+	HasFlagship int         `json:"has_flagship" bson:"has_flagship"` // 0-无，1-有
+	DsrStr      string      `json:"dsr_str" bson:"dsr_str"`
+	Dsr         float64     `json:"dsr" bson:"dsr"`
+	Lv1         string      `json:"lv1" bson:"lv1"` // 一级类目
+	SkuCount    string      `json:"sku_count" bson:"sku_count"`
+	IsFollowed  bool        `json:"is_followed" bson:"is_followed"`
+	Stat        interface{} `json:"stat" bson:"stat"`
 }
 
 // StoreDAO 店铺数据访问对象
