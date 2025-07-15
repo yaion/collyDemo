@@ -1,7 +1,6 @@
 package core
 
 import (
-	"collyDemo/handlers"
 	"fmt"
 	"time"
 
@@ -46,7 +45,7 @@ func GetMainTasks() []TaskConfig {
 			URL:     "https://service.kaogujia.com/api/author/search?limit=50&page=1&sort_field=gmv&sort=0",
 			Method:  "POST",
 			Body:    []byte(`{"sort_field":"gmv","sort":0,"limit":50,"page":1}`),
-			Handler: handlers.AuthorHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -57,7 +56,7 @@ func GetMainTasks() []TaskConfig {
 			URL:     "https://service.kaogujia.com/api/brand/search?limit=50&page=1&sort_field=gmv&sort=0",
 			Method:  "POST",
 			Body:    []byte(`{"period":1,"keyword":""}`),
-			Handler: handlers.BrandHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -68,7 +67,7 @@ func GetMainTasks() []TaskConfig {
 			URL:     "https://service.kaogujia.com/api/live/search?limit=50&page=1&sort_field=gmv&sort=0",
 			Method:  "POST",
 			Body:    []byte(`{"pub_time":{"min":"20250629","max":"20250705"},"keyword":"","keyword_type":1}`),
-			Handler: handlers.LiveHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -79,7 +78,7 @@ func GetMainTasks() []TaskConfig {
 			URL:     "https://service.kaogujia.com/api/sku/search?limit=50&page=1&sort_field=sales&sort=0",
 			Method:  "POST",
 			Body:    []byte(`{"period":1,"keyword":""}`),
-			Handler: handlers.ProductHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -90,7 +89,7 @@ func GetMainTasks() []TaskConfig {
 			URL:     "https://service.kaogujia.com/api/shop/search?limit=50&page=1&sort_field=gmv&sort=0",
 			Method:  "POST",
 			Body:    []byte(`{"period":1,"keyword":""}`),
-			Handler: handlers.StoreHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -101,7 +100,7 @@ func GetMainTasks() []TaskConfig {
 			URL:     "https://service.kaogujia.com/api/video/search?limit=50&page=1&sort_field=like_count&sort=0",
 			Method:  "POST",
 			Body:    []byte(`{"date_code":{"min":"20250629","max":"20250705"},"keyword":"","video_type":1}`),
-			Handler: handlers.VideoHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -117,7 +116,7 @@ func GetRankTasks() []TaskConfig {
 		{
 			URL:     "https://service.kaogujia.com/api/rank/author/fans/increase?limit=50&page=1",
 			Method:  "GET",
-			Handler: handlers.AuthorFansIncreaseRankHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -127,7 +126,7 @@ func GetRankTasks() []TaskConfig {
 		{
 			URL:     "https://service.kaogujia.com/api/rank/author/fans/decrease?limit=50&page=1",
 			Method:  "GET",
-			Handler: handlers.AuthorFansDecreaseRankHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -137,7 +136,7 @@ func GetRankTasks() []TaskConfig {
 		{
 			URL:     "https://service.kaogujia.com/api/rank/author/potential?limit=50&page=1",
 			Method:  "GET",
-			Handler: handlers.AuthorPotentialRankHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -147,7 +146,7 @@ func GetRankTasks() []TaskConfig {
 		{
 			URL:     "https://service.kaogujia.com/api/rank/product/hot/sale?limit=50&page=1",
 			Method:  "GET",
-			Handler: handlers.ProductHotSaleRankHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -157,7 +156,7 @@ func GetRankTasks() []TaskConfig {
 		{
 			URL:     "https://service.kaogujia.com/api/rank/product/real/time/sales?limit=50&page=1",
 			Method:  "GET",
-			Handler: handlers.ProductRealTimeSalesRankHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -167,7 +166,7 @@ func GetRankTasks() []TaskConfig {
 		{
 			URL:     "https://service.kaogujia.com/api/rank/live/author/sales?limit=50&page=1",
 			Method:  "GET",
-			Handler: handlers.LiveAuthorSalesRankHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -177,7 +176,7 @@ func GetRankTasks() []TaskConfig {
 		{
 			URL:     "https://service.kaogujia.com/api/rank/live/hot/push?limit=50&page=1",
 			Method:  "GET",
-			Handler: handlers.LiveHotPushRankHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -187,7 +186,7 @@ func GetRankTasks() []TaskConfig {
 		{
 			URL:     "https://service.kaogujia.com/api/rank/video/hot?limit=50&page=1",
 			Method:  "GET",
-			Handler: handlers.HotVideoRankHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -197,7 +196,7 @@ func GetRankTasks() []TaskConfig {
 		{
 			URL:     "https://service.kaogujia.com/api/rank/video/ecommerce?limit=50&page=1",
 			Method:  "GET",
-			Handler: handlers.EcommerceVideoRankHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -207,7 +206,7 @@ func GetRankTasks() []TaskConfig {
 		{
 			URL:     "https://service.kaogujia.com/api/rank/video/hot/push?limit=50&page=1",
 			Method:  "GET",
-			Handler: handlers.VideoHotPushHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -217,7 +216,7 @@ func GetRankTasks() []TaskConfig {
 		{
 			URL:     "https://service.kaogujia.com/api/rank/shop/hot/sale?limit=50&page=1",
 			Method:  "GET",
-			Handler: handlers.HotSaleShopHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -227,7 +226,7 @@ func GetRankTasks() []TaskConfig {
 		{
 			URL:     "https://service.kaogujia.com/api/rank/site/hourly?limit=50&page=1",
 			Method:  "GET",
-			Handler: handlers.SiteHourlyRankHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -237,7 +236,7 @@ func GetRankTasks() []TaskConfig {
 		{
 			URL:     "https://service.kaogujia.com/api/rank/sales/hourly?limit=50&page=1",
 			Method:  "GET",
-			Handler: handlers.SalesHourlyRankHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -247,7 +246,7 @@ func GetRankTasks() []TaskConfig {
 		{
 			URL:     "https://service.kaogujia.com/api/hot/spot/real/time?limit=50&page=1",
 			Method:  "GET",
-			Handler: handlers.RealTimeHotSpotHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -257,7 +256,7 @@ func GetRankTasks() []TaskConfig {
 		{
 			URL:     "https://service.kaogujia.com/api/hot/spot/soaring?limit=50&page=1",
 			Method:  "GET",
-			Handler: handlers.SoaringHotSpotHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -267,7 +266,7 @@ func GetRankTasks() []TaskConfig {
 		{
 			URL:     "https://service.kaogujia.com/api/explore/hot/burst?limit=50&page=1",
 			Method:  "GET",
-			Handler: handlers.ExploreHotBurstHandler,
+			Handler: nil, // 将在运行时设置
 			Meta: map[string]interface{}{
 				"page":     1,
 				"pageSize": 50,
@@ -308,6 +307,7 @@ func CreateDetailTask(baseURL, id string, handler func(*colly.Response, *Account
 type TaskScheduler struct {
 	dispatcher *TaskDispatcher
 	headers    map[string]string
+	handlers   map[string]func(*colly.Response, *Account, *TaskDispatcher) error
 }
 
 // NewTaskScheduler 创建任务调度器
@@ -315,38 +315,58 @@ func NewTaskScheduler(dispatcher *TaskDispatcher, token string) *TaskScheduler {
 	return &TaskScheduler{
 		dispatcher: dispatcher,
 		headers:    GetDefaultHeaders(token),
+		handlers:   make(map[string]func(*colly.Response, *Account, *TaskDispatcher) error),
 	}
+}
+
+// RegisterHandler 注册处理器
+func (s *TaskScheduler) RegisterHandler(name string, handler func(*colly.Response, *Account, *TaskDispatcher) error) {
+	s.handlers[name] = handler
 }
 
 // AddMainTasks 添加主要任务
 func (s *TaskScheduler) AddMainTasks() {
 	tasks := GetMainTasks()
-	for _, config := range tasks {
-		task := &Task{
-			URL:     config.URL,
-			Method:  config.Method,
-			Headers: s.headers,
-			Body:    config.Body,
-			Handler: config.Handler,
-			Meta:    config.Meta,
+	handlerNames := []string{"author", "brand", "live", "product", "store", "video"}
+
+	for i, config := range tasks {
+		if i < len(handlerNames) && s.handlers[handlerNames[i]] != nil {
+			task := &Task{
+				URL:     config.URL,
+				Method:  config.Method,
+				Headers: s.headers,
+				Body:    config.Body,
+				Handler: s.handlers[handlerNames[i]],
+				Meta:    config.Meta,
+			}
+			s.dispatcher.AddTask(task)
 		}
-		s.dispatcher.AddTask(task)
 	}
 }
 
 // AddRankTasks 添加排名任务
 func (s *TaskScheduler) AddRankTasks() {
 	tasks := GetRankTasks()
-	for _, config := range tasks {
-		task := &Task{
-			URL:     config.URL,
-			Method:  config.Method,
-			Headers: s.headers,
-			Body:    config.Body,
-			Handler: config.Handler,
-			Meta:    config.Meta,
+	handlerNames := []string{
+		"author_fans_increase_rank", "author_fans_decrease_rank", "author_potential_rank",
+		"product_hot_sale_rank", "product_real_time_sales_rank", "live_author_sales_rank",
+		"live_hot_push_rank", "hot_video_rank", "ecommerce_video_rank", "video_hot_push",
+		"hot_sale_shop", "site_hourly_rank", "sales_hourly_rank", "real_time_hot_spot",
+		"soaring_hot_spot", "explore_hot_burst",
+	}
+
+	for i, config := range tasks {
+		if i < len(handlerNames) && s.handlers[handlerNames[i]] != nil {
+			task := &Task{
+				URL:     config.URL,
+				Method:  config.Method,
+				Headers: s.headers,
+				Body:    config.Body,
+				Handler: s.handlers[handlerNames[i]],
+				Meta:    config.Meta,
+			}
+			s.dispatcher.AddTask(task)
 		}
-		s.dispatcher.AddTask(task)
 	}
 }
 

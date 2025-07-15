@@ -1,0 +1,34 @@
+{
+  "main_tasks": {
+    "author": "6h",
+    "brand": "12h",
+    "live": "2h",
+    "product": "4h",
+    "store": "8h",
+    "video": "3h"
+  },
+  "rank_tasks": {
+    "author_fans_increase_rank": "1h",
+    "author_fans_decrease_rank": "1h",
+    "author_potential_rank": "1h",
+    "product_hot_sale_rank": "1h",
+    "product_real_time_sales_rank": "1h",
+    "live_author_sales_rank": "1h",
+    "live_hot_push_rank": "1h",
+    "hot_video_rank": "1h",
+    "ecommerce_video_rank": "1h",
+    "video_hot_push": "1h",
+    "hot_sale_shop": "1h",
+    "site_hourly_rank": "1h",
+    "sales_hourly_rank": "1h",
+    "real_time_hot_spot": "1h",
+    "soaring_hot_spot": "1h",
+    "explore_hot_burst": "1h"
+  },
+  "system": {
+    "max_retries": 3,
+    "retry_delay": "5s",
+    "task_timeout": "5m",
+    "max_concurrency": 3
+  }
+} 

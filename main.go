@@ -1,11 +1,15 @@
 package main
 
 import (
+	"collyDemo/config"
 	"collyDemo/core"
 	"collyDemo/handlers"
 	"collyDemo/mongodb"
 	"log"
 	"math/rand"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -13,6 +17,10 @@ func main() {
 	// 初始化 mongo
 	mongodb.InitMongo()
 	rand.Seed(time.Now().UnixNano())
+
+	// 加载配置
+	scheduleConfig := config.GetDefaultConfig()
+
 	// 初始化账号池
 	accounts := []*core.Account{
 		/*{
@@ -54,297 +62,109 @@ func main() {
 	// 创建任务调度器
 	dispatcher := core.NewTaskDispatcher(accountPool)
 
-	headers := map[string]string{
-		"accept":             "*/*",
-		"accept-language":    "zh-HK,zh-CN;q=0.9,zh;q=0.8,zh-TW;q=0.7",
-		"authorization":      "Bearer eyJhbGciOiJIUzUxMiJ9.eyJhdWQiOiIxMDAwIiwiaXNzIjoia2FvZ3VqaWEuY29tIiwianRpIjoiNjI3MmYyN2EyZDU5NDc0YThhYzk1NTQyNzgyYjM4OWIiLCJzaWQiOjgyMjY4NzcsImlhdCI6MTc0OTkwMDQ0MywiZXhwIjoxNzUwNTA1MjQzLCJid2UiOjAsInR5cCI6MSwicF9id2UiOjB9.sTul3qBenukj-HiOsTS_CnzHM0TV91cLA_U6dm6U5Z5ZFYgu6ZeTM3_Ai4AYdmvDN7q_SMoFjoQvv_LNo2VdzQ",
-		"origin":             "https://www.kaogujia.com",
-		"priority":           "u=1, i",
-		"referer":            "https://www.kaogujia.com/",
-		"sec-ch-ua":          `"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"`,
-		"sec-ch-ua-mobile":   "?0",
-		"sec-ch-ua-platform": `"Windows"`,
-		"sec-fetch-dest":     "empty",
-		"sec-fetch-mode":     "cors",
-		"sec-fetch-site":     "same-site",
-		"user-agent":         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
-		"version_code":       "3.1",
-		"content-type":       "application/json",
+	// 创建任务配置调度器
+	taskScheduler := core.NewTaskScheduler(dispatcher, accounts[0].Token)
+
+	// 注册所有处理器
+	registerHandlers(taskScheduler)
+
+	// 创建定时任务调度器
+	scheduler := core.NewScheduler(dispatcher, taskScheduler)
+
+	// 使用配置文件初始化定时任务
+	mainSchedules := scheduleConfig.GetMainTaskSchedules()
+	rankSchedules := scheduleConfig.GetRankTaskSchedules()
+	scheduler.InitTasksWithConfig(mainSchedules, rankSchedules)
+
+	// 启动定时任务调度器
+	scheduler.Start()
+
+	// 启动爬虫工作池，设置并发数为账号数量
+	go dispatcher.Run(scheduleConfig.System.MaxConcurrency)
+
+	// 启动任务状态监控
+	go monitorTaskStatus(dispatcher, scheduler)
+
+	// 等待中断信号
+	waitForInterrupt()
+
+	// 优雅关闭
+	log.Println("正在关闭系统...")
+	scheduler.Stop()
+	dispatcher.Stop()
+	log.Println("系统已关闭")
+}
+
+// registerHandlers 注册所有处理器
+func registerHandlers(taskScheduler *core.TaskScheduler) {
+	// 主要数据处理器
+	taskScheduler.RegisterHandler("author", handlers.AuthorHandler)
+	taskScheduler.RegisterHandler("brand", handlers.BrandHandler)
+	taskScheduler.RegisterHandler("live", handlers.LiveHandler)
+	taskScheduler.RegisterHandler("product", handlers.ProductHandler)
+	taskScheduler.RegisterHandler("store", handlers.StoreHandler)
+	taskScheduler.RegisterHandler("video", handlers.VideoHandler)
+
+	// 详情处理器
+	taskScheduler.RegisterHandler("author_info", handlers.AuthorInfoHandler)
+	taskScheduler.RegisterHandler("brand_info", handlers.BrandInfoHandler)
+	taskScheduler.RegisterHandler("product_info", handlers.ProductInfoHandler)
+	taskScheduler.RegisterHandler("live_info", handlers.LiveInfoHandler)
+	taskScheduler.RegisterHandler("video_info", handlers.VideoInfoHandler)
+	taskScheduler.RegisterHandler("store_info", handlers.StoreInfoHandler)
+
+	// 排名数据处理器
+	taskScheduler.RegisterHandler("author_fans_increase_rank", handlers.AuthorFansIncreaseRankHandler)
+	taskScheduler.RegisterHandler("author_fans_decrease_rank", handlers.AuthorFansDecreaseRankHandler)
+	taskScheduler.RegisterHandler("author_potential_rank", handlers.AuthorPotentialRankHandler)
+	taskScheduler.RegisterHandler("product_hot_sale_rank", handlers.ProductHotSaleRankHandler)
+	taskScheduler.RegisterHandler("product_real_time_sales_rank", handlers.ProductRealTimeSalesRankHandler)
+	taskScheduler.RegisterHandler("live_author_sales_rank", handlers.LiveAuthorSalesRankHandler)
+	taskScheduler.RegisterHandler("live_hot_push_rank", handlers.LiveHotPushRankHandler)
+	taskScheduler.RegisterHandler("hot_video_rank", handlers.HotVideoRankHandler)
+	taskScheduler.RegisterHandler("ecommerce_video_rank", handlers.EcommerceVideoRankHandler)
+	taskScheduler.RegisterHandler("video_hot_push", handlers.VideoHotPushHandler)
+	taskScheduler.RegisterHandler("hot_sale_shop", handlers.HotSaleShopHandler)
+	taskScheduler.RegisterHandler("site_hourly_rank", handlers.SiteHourlyRankHandler)
+	taskScheduler.RegisterHandler("sales_hourly_rank", handlers.SalesHourlyRankHandler)
+	taskScheduler.RegisterHandler("real_time_hot_spot", handlers.RealTimeHotSpotHandler)
+	taskScheduler.RegisterHandler("soaring_hot_spot", handlers.SoaringHotSpotHandler)
+	taskScheduler.RegisterHandler("explore_hot_burst", handlers.ExploreHotBurstHandler)
+
+	log.Println("所有处理器注册完成")
+}
+
+// monitorTaskStatus 监控任务状态
+func monitorTaskStatus(dispatcher *core.TaskDispatcher, scheduler *core.Scheduler) {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			queueLen, active := dispatcher.TaskStatus()
+			taskStatus := scheduler.GetTaskStatus()
+
+			log.Printf("=== 系统状态监控 ===")
+			log.Printf("任务队列长度: %d", queueLen)
+			log.Printf("活跃任务数: %d", active)
+			log.Printf("定时任务状态:")
+
+			for id, status := range taskStatus {
+				statusMap := status.(map[string]interface{})
+				log.Printf("  %s: %s (下次执行: %s)",
+					id,
+					statusMap["name"],
+					statusMap["next_run"].(time.Time).Format("2006-01-02 15:04:05"))
+			}
+			log.Printf("==================")
+		}
 	}
+}
 
-	// 添加初始author任务
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/author/search?limit=50&page=1&sort_field=gmv&sort=0",
-		Method:  "POST",
-		Headers: headers,
-		Body:    []byte(`{"sort_field":"gmv","sort":0,"limit":50,"page":1}`),
-		Handler: handlers.AuthorHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 添加初始品牌任务
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/brand/search?limit=50&page=1&sort_field=gmv&sort=0",
-		Method:  "POST",
-		Headers: headers,
-		Body:    []byte(`{"period":1,"keyword":""}`),
-		Handler: handlers.BrandHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 添加初始直播任务
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/live/search?limit=50&page=1&sort_field=gmv&sort=0",
-		Method:  "POST",
-		Headers: headers,
-		Body:    []byte(`{"pub_time":{"min":"20250629","max":"20250705"},"keyword":"","keyword_type":1}`),
-		Handler: handlers.LiveHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 添加初始商品任务
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/sku/search?limit=50&page=1&sort_field=sales&sort=0",
-		Method:  "POST",
-		Headers: headers,
-		Body:    []byte(`{"period":1,"keyword":""}`),
-		Handler: handlers.ProductHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 添加初始店铺任务
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/shop/search?limit=50&page=1&sort_field=gmv&sort=0",
-		Method:  "POST",
-		Headers: headers,
-		Body:    []byte(`{"period":1,"keyword":""}`),
-		Handler: handlers.StoreHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 添加初始视频任务
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/video/search?limit=50&page=1&sort_field=like_count&sort=0",
-		Method:  "POST",
-		Headers: headers,
-		Body:    []byte(`{"date_code":{"min":"20250629","max":"20250705"},"keyword":"","video_type":1}`),
-		Handler: handlers.VideoHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 添加排名数据任务
-	// 达人涨粉榜
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/rank/author/fans/increase?limit=50&page=1",
-		Method:  "GET",
-		Headers: headers,
-		Handler: handlers.AuthorFansIncreaseRankHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 达人掉粉榜
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/rank/author/fans/decrease?limit=50&page=1",
-		Method:  "GET",
-		Headers: headers,
-		Handler: handlers.AuthorFansDecreaseRankHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 达人带货潜力榜
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/rank/author/potential?limit=50&page=1",
-		Method:  "GET",
-		Headers: headers,
-		Handler: handlers.AuthorPotentialRankHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 商品热销榜
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/rank/product/hot/sale?limit=50&page=1",
-		Method:  "GET",
-		Headers: headers,
-		Handler: handlers.ProductHotSaleRankHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 商品实时销量榜
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/rank/product/real/time/sales?limit=50&page=1",
-		Method:  "GET",
-		Headers: headers,
-		Handler: handlers.ProductRealTimeSalesRankHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 直播达人带货榜
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/rank/live/author/sales?limit=50&page=1",
-		Method:  "GET",
-		Headers: headers,
-		Handler: handlers.LiveAuthorSalesRankHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 直播热推榜
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/rank/live/hot/push?limit=50&page=1",
-		Method:  "GET",
-		Headers: headers,
-		Handler: handlers.LiveHotPushRankHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 热门视频榜
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/rank/video/hot?limit=50&page=1",
-		Method:  "GET",
-		Headers: headers,
-		Handler: handlers.HotVideoRankHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 电商视频榜
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/rank/video/ecommerce?limit=50&page=1",
-		Method:  "GET",
-		Headers: headers,
-		Handler: handlers.EcommerceVideoRankHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 视频热推
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/rank/video/hot/push?limit=50&page=1",
-		Method:  "GET",
-		Headers: headers,
-		Handler: handlers.VideoHotPushHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 热销小店
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/rank/shop/hot/sale?limit=50&page=1",
-		Method:  "GET",
-		Headers: headers,
-		Handler: handlers.HotSaleShopHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 全站小时榜
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/rank/site/hourly?limit=50&page=1",
-		Method:  "GET",
-		Headers: headers,
-		Handler: handlers.SiteHourlyRankHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 带货小时榜
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/rank/sales/hourly?limit=50&page=1",
-		Method:  "GET",
-		Headers: headers,
-		Handler: handlers.SalesHourlyRankHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 实时热点
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/hot/spot/real/time?limit=50&page=1",
-		Method:  "GET",
-		Headers: headers,
-		Handler: handlers.RealTimeHotSpotHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 飙升热点
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/hot/spot/soaring?limit=50&page=1",
-		Method:  "GET",
-		Headers: headers,
-		Handler: handlers.SoaringHotSpotHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 探测爆款
-	dispatcher.AddTask(&core.Task{
-		URL:     "https://service.kaogujia.com/api/explore/hot/burst?limit=50&page=1",
-		Method:  "GET",
-		Headers: headers,
-		Handler: handlers.ExploreHotBurstHandler,
-		Meta: map[string]interface{}{
-			"page":     1,
-			"pageSize": 50,
-		},
-	})
-
-	// 启动爬虫，设置并发数为3
-	dispatcher.Run(len(accounts))
-
-	log.Println("所有任务处理完成")
+// waitForInterrupt 等待中断信号
+func waitForInterrupt() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	<-c
 }
