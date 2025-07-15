@@ -20,6 +20,7 @@ type StoreResult struct {
 }
 
 func StoreHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) error {
+	log.Printf("处理店铺列表: %s", r.Request.URL.String())
 	str, err := Handler(r)
 	if err != nil {
 		return err
@@ -38,12 +39,12 @@ func StoreHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) 
 	db := client.Database("kaogujia")
 	dao := mongodb.NewStoreDAO(db)
 	var docs []interface{}
-	for _, author := range result.Items {
-		docs = append(docs, author)
+	for _, store := range result.Items {
+		docs = append(docs, store)
 	}
 	err = dao.BatchCreate(context.Background(), docs)
 	if err != nil {
-		log.Printf("Create author error: %v", err)
+		log.Printf("Create store error: %v", err)
 		return err
 	}
 	headers := map[string]string{
@@ -63,8 +64,10 @@ func StoreHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) 
 		"version_code":       "3.1",
 		"content-type":       "application/json",
 	}
+
+	// 处理分页
 	if result.Pagination.TotalCount > result.Pagination.Page*result.Pagination.Limit {
-		// 创建任务
+		// 创建下一页任务
 		listTask := &core.Task{
 			URL:     fmt.Sprintf("https://service.kaogujia.com/api/shop/search?limit=%v&page=%v&sort_field=gmv&sort=0", result.Pagination.Limit, result.Pagination.Page+1),
 			Method:  "POST",
@@ -72,13 +75,56 @@ func StoreHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) 
 			Body:    []byte(`{"period":1,"keyword":""}`),
 			Handler: StoreHandler,
 			Meta: map[string]interface{}{
-				"page":     1,
-				"pageSize": 50,
+				"page":  result.Pagination.Page + 1,
+				"limit": result.Pagination.Limit,
 			},
 		}
 		d.AddTask(listTask)
 	}
-	// todo 创建info任务
 
+	// 获取店铺详情数据
+	for _, item := range result.Items {
+		log.Printf("处理店铺详情: ID=%s, Name=%s", item.ShopID, item.Name)
+		// 创建详情任务
+		infoTask := &core.Task{
+			URL:     fmt.Sprintf("https://service.kaogujia.com/api/shop/detail/%s", item.ShopID),
+			Method:  "GET",
+			Headers: headers,
+			Handler: StoreInfoHandler,
+			Meta: map[string]interface{}{
+				"shop_id": item.ShopID,
+			},
+		}
+		d.AddTask(infoTask)
+	}
+
+	log.Printf("店铺列表处理完成: %s", r.Request.URL.String())
+	return nil
+}
+
+func StoreInfoHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) error {
+	log.Printf("处理店铺详情: %s", r.Request.URL.String())
+	str, err := Handler(r)
+	if err != nil {
+		return err
+	}
+	result := new(mongodb.Store)
+	err = json.Unmarshal([]byte(str), result)
+	if err != nil {
+		log.Printf("Unmarshal error: %v,str : %v", err, str)
+		utils.WriteToFile("store_info.json", str)
+		return err
+	}
+	//  插入详情数据
+	client := mongodb.GetMongo()
+	db := client.Database("kaogujia")
+	dao := mongodb.NewStoreDAO(db)
+	err = dao.Create(context.Background(), result)
+	if err != nil {
+		log.Printf("Create store info error: %v", err)
+		return err
+	}
+
+	log.Printf("店铺详情处理完成: %s", r.Request.URL.String())
 	return nil
 }

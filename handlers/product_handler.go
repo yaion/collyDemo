@@ -20,6 +20,7 @@ type ProductResult struct {
 }
 
 func ProductHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) error {
+	log.Printf("处理商品列表: %s", r.Request.URL.String())
 	str, err := Handler(r)
 	if err != nil {
 		return err
@@ -38,12 +39,12 @@ func ProductHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher
 	db := client.Database("kaogujia")
 	dao := mongodb.NewProductDAO(db)
 	var docs []interface{}
-	for _, author := range result.Items {
-		docs = append(docs, author)
+	for _, product := range result.Items {
+		docs = append(docs, product)
 	}
 	err = dao.BatchCreate(context.Background(), docs)
 	if err != nil {
-		log.Printf("Create author error: %v", err)
+		log.Printf("Create product error: %v", err)
 		return err
 	}
 	headers := map[string]string{
@@ -63,22 +64,67 @@ func ProductHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher
 		"version_code":       "3.1",
 		"content-type":       "application/json",
 	}
+
+	// 处理分页
 	if result.Pagination.TotalCount > result.Pagination.Page*result.Pagination.Limit {
-		// 创建任务
+		// 创建下一页任务
 		listTask := &core.Task{
 			URL:     fmt.Sprintf("https://service.kaogujia.com/api/sku/search?limit=%v&page=%v&sort_field=sales&sort=0", result.Pagination.Limit, result.Pagination.Page+1),
 			Method:  "POST",
 			Headers: headers,
-			Body:    []byte(`{"pub_time":{"min":"20250629","max":"20250705"},"keyword":"","keyword_type":1}`),
+			Body:    []byte(`{"period":1,"keyword":""}`),
 			Handler: ProductHandler,
 			Meta: map[string]interface{}{
-				"page":     1,
-				"pageSize": 50,
+				"page":  result.Pagination.Page + 1,
+				"limit": result.Pagination.Limit,
 			},
 		}
 		d.AddTask(listTask)
 	}
-	// todo 创建info任务
 
+	// 获取商品详情数据
+	for _, item := range result.Items {
+		log.Printf("处理商品详情: ID=%s, Title=%s", item.ProductID, item.Title)
+		// 创建详情任务
+		infoTask := &core.Task{
+			URL:     fmt.Sprintf("https://service.kaogujia.com/api/sku/detail/%s", item.ProductID),
+			Method:  "GET",
+			Headers: headers,
+			Handler: ProductInfoHandler,
+			Meta: map[string]interface{}{
+				"product_id": item.ProductID,
+			},
+		}
+		d.AddTask(infoTask)
+	}
+
+	log.Printf("商品列表处理完成: %s", r.Request.URL.String())
+	return nil
+}
+
+func ProductInfoHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) error {
+	log.Printf("处理商品详情: %s", r.Request.URL.String())
+	str, err := Handler(r)
+	if err != nil {
+		return err
+	}
+	result := new(mongodb.Product)
+	err = json.Unmarshal([]byte(str), result)
+	if err != nil {
+		log.Printf("Unmarshal error: %v,str : %v", err, str)
+		utils.WriteToFile("product_info.json", str)
+		return err
+	}
+	//  插入详情数据
+	client := mongodb.GetMongo()
+	db := client.Database("kaogujia")
+	dao := mongodb.NewProductDAO(db)
+	err = dao.Create(context.Background(), result)
+	if err != nil {
+		log.Printf("Create product info error: %v", err)
+		return err
+	}
+
+	log.Printf("商品详情处理完成: %s", r.Request.URL.String())
 	return nil
 }

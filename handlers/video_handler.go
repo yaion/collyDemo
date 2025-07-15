@@ -20,6 +20,7 @@ type VideoResult struct {
 }
 
 func VideoHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) error {
+	log.Printf("处理视频列表: %s", r.Request.URL.String())
 	str, err := Handler(r)
 	if err != nil {
 		return err
@@ -38,12 +39,12 @@ func VideoHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) 
 	db := client.Database("kaogujia")
 	dao := mongodb.NewVideoDAO(db)
 	var docs []interface{}
-	for _, author := range result.Items {
-		docs = append(docs, author)
+	for _, video := range result.Items {
+		docs = append(docs, video)
 	}
 	err = dao.BatchCreate(context.Background(), docs)
 	if err != nil {
-		log.Printf("Create author error: %v", err)
+		log.Printf("Create video error: %v", err)
 		return err
 	}
 	headers := map[string]string{
@@ -63,8 +64,10 @@ func VideoHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) 
 		"version_code":       "3.1",
 		"content-type":       "application/json",
 	}
+
+	// 处理分页
 	if result.Pagination.TotalCount > result.Pagination.Page*result.Pagination.Limit {
-		// 创建任务
+		// 创建下一页任务
 		listTask := &core.Task{
 			URL:     fmt.Sprintf("https://service.kaogujia.com/api/video/search?limit=%v&page=%v&sort_field=like_count&sort=0", result.Pagination.Limit, result.Pagination.Page+1),
 			Method:  "POST",
@@ -72,12 +75,56 @@ func VideoHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) 
 			Body:    []byte(`{"date_code":{"min":"20250629","max":"20250705"},"keyword":"","video_type":1}`),
 			Handler: VideoHandler,
 			Meta: map[string]interface{}{
-				"page":     1,
-				"pageSize": 50,
+				"page":  result.Pagination.Page + 1,
+				"limit": result.Pagination.Limit,
 			},
 		}
 		d.AddTask(listTask)
 	}
-	//todo 创建info任务
+
+	// 获取视频详情数据
+	for _, item := range result.Items {
+		log.Printf("处理视频详情: ID=%s, Desc=%s", item.AwemeID, item.Desc)
+		// 创建详情任务
+		infoTask := &core.Task{
+			URL:     fmt.Sprintf("https://service.kaogujia.com/api/video/detail/%s", item.AwemeID),
+			Method:  "GET",
+			Headers: headers,
+			Handler: VideoInfoHandler,
+			Meta: map[string]interface{}{
+				"aweme_id": item.AwemeID,
+			},
+		}
+		d.AddTask(infoTask)
+	}
+
+	log.Printf("视频列表处理完成: %s", r.Request.URL.String())
+	return nil
+}
+
+func VideoInfoHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) error {
+	log.Printf("处理视频详情: %s", r.Request.URL.String())
+	str, err := Handler(r)
+	if err != nil {
+		return err
+	}
+	result := new(mongodb.Video)
+	err = json.Unmarshal([]byte(str), result)
+	if err != nil {
+		log.Printf("Unmarshal error: %v,str : %v", err, str)
+		utils.WriteToFile("video_info.json", str)
+		return err
+	}
+	//  插入详情数据
+	client := mongodb.GetMongo()
+	db := client.Database("kaogujia")
+	dao := mongodb.NewVideoDAO(db)
+	err = dao.Create(context.Background(), result)
+	if err != nil {
+		log.Printf("Create video info error: %v", err)
+		return err
+	}
+
+	log.Printf("视频详情处理完成: %s", r.Request.URL.String())
 	return nil
 }

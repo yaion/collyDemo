@@ -20,6 +20,7 @@ type AuthorResult struct {
 }
 
 func AuthorHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) error {
+	log.Printf("处理达人列表: %s", r.Request.URL.String())
 	str, err := Handler(r)
 	if err != nil {
 		return err
@@ -28,7 +29,7 @@ func AuthorHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher)
 	err = json.Unmarshal([]byte(str), result)
 	if err != nil {
 		log.Printf("Unmarshal error: %v,str : %v", err, str)
-		utils.WriteToFile("brand.json", str)
+		utils.WriteToFile("author.json", str)
 		return err
 	}
 
@@ -67,12 +68,14 @@ func AuthorHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher)
 		return err
 	}
 
+	// 处理分页
 	if result.Pagination.TotalCount > result.Pagination.Page*result.Pagination.Limit {
-		// 创建info任务
+		// 创建下一页任务
 		listTask := &core.Task{
 			URL:     fmt.Sprintf("https://service.kaogujia.com/api/author/search?limit=%v&page=%v&sort_field=gmv&sort=0", result.Pagination.Limit, result.Pagination.Page+1),
-			Method:  "GET",
+			Method:  "POST",
 			Headers: headers,
+			Body:    []byte(`{"sort_field":"gmv","sort":0,"limit":50,"page":1}`),
 			Handler: AuthorHandler,
 			Meta: map[string]interface{}{
 				"page":  result.Pagination.Page + 1,
@@ -84,20 +87,26 @@ func AuthorHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher)
 
 	// 获取详情数据
 	for _, item := range result.Items {
-		log.Printf("处理项目: ID=%s, Name=%s", item.UID, item.NickName)
-		// 创建info任务
+		log.Printf("处理达人详情: ID=%s, Name=%s", item.UID, item.NickName)
+		// 创建详情任务
 		infoTask := &core.Task{
 			URL:     fmt.Sprintf("https://service.kaogujia.com/api/author/detail/%s", item.UID),
 			Method:  "GET",
 			Headers: headers,
 			Handler: AuthorInfoHandler,
+			Meta: map[string]interface{}{
+				"uid": item.UID,
+			},
 		}
 		d.AddTask(infoTask)
 	}
+
+	log.Printf("达人列表处理完成: %s", r.Request.URL.String())
 	return nil
 }
 
 func AuthorInfoHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) error {
+	log.Printf("处理达人详情: %s", r.Request.URL.String())
 	str, err := Handler(r)
 	if err != nil {
 		return err
@@ -106,6 +115,7 @@ func AuthorInfoHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatc
 	err = json.Unmarshal([]byte(str), result)
 	if err != nil {
 		log.Printf("Unmarshal error: %v,str : %v", err, str)
+		utils.WriteToFile("author_info.json", str)
 		return err
 	}
 	//  插入详情数据
@@ -114,9 +124,10 @@ func AuthorInfoHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatc
 	dao := mongodb.NewAuthorInfo(db)
 	err = dao.Create(context.Background(), result)
 	if err != nil {
-		log.Printf("Create author error: %v", err)
+		log.Printf("Create author info error: %v", err)
 		return err
 	}
 
+	log.Printf("达人详情处理完成: %s", r.Request.URL.String())
 	return nil
 }

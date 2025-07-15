@@ -7,8 +7,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gocolly/colly/v2"
 	"log"
+
+	"github.com/gocolly/colly/v2"
 )
 
 type BrandResult struct {
@@ -19,7 +20,7 @@ type BrandResult struct {
 }
 
 func BrandHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) error {
-	log.Printf("处理品牌: %s", r.Request.URL.String())
+	log.Printf("处理品牌列表: %s", r.Request.URL.String())
 	str, err := Handler(r)
 	if err != nil {
 		return err
@@ -38,12 +39,12 @@ func BrandHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) 
 	db := client.Database("kaogujia")
 	dao := mongodb.NewBrandDAO(db)
 	var docs []interface{}
-	for _, author := range result.Items {
-		docs = append(docs, author)
+	for _, brand := range result.Items {
+		docs = append(docs, brand)
 	}
 	err = dao.BatchCreate(context.Background(), docs)
 	if err != nil {
-		log.Printf("Create author error: %v", err)
+		log.Printf("Create brand error: %v", err)
 		return err
 	}
 	headers := map[string]string{
@@ -63,8 +64,10 @@ func BrandHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) 
 		"version_code":       "3.1",
 		"content-type":       "application/json",
 	}
+
+	// 处理分页
 	if result.Pagination.TotalCount > result.Pagination.Page*result.Pagination.Limit {
-		// 创建任务
+		// 创建下一页任务
 		listTask := &core.Task{
 			URL:     fmt.Sprintf("https://service.kaogujia.com/api/brand/search?limit=%v&page=%v&sort_field=gmv&sort=0", result.Pagination.Limit, result.Pagination.Page+1),
 			Method:  "POST",
@@ -72,14 +75,56 @@ func BrandHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) 
 			Body:    []byte(`{"period":1,"keyword":""}`),
 			Handler: BrandHandler,
 			Meta: map[string]interface{}{
-				"page":     1,
-				"pageSize": 50,
+				"page":  result.Pagination.Page + 1,
+				"limit": result.Pagination.Limit,
 			},
 		}
 		d.AddTask(listTask)
 	}
 
-	// todo 创建info任务
-	log.Printf("处理品牌完成: %s", r.Request.URL.String())
+	// 获取品牌详情数据
+	for _, item := range result.Items {
+		log.Printf("处理品牌详情: ID=%s, Name=%s", item.BrandID, item.Name)
+		// 创建详情任务
+		infoTask := &core.Task{
+			URL:     fmt.Sprintf("https://service.kaogujia.com/api/brand/detail/%s", item.BrandID),
+			Method:  "GET",
+			Headers: headers,
+			Handler: BrandInfoHandler,
+			Meta: map[string]interface{}{
+				"brand_id": item.BrandID,
+			},
+		}
+		d.AddTask(infoTask)
+	}
+
+	log.Printf("品牌列表处理完成: %s", r.Request.URL.String())
+	return nil
+}
+
+func BrandInfoHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) error {
+	log.Printf("处理品牌详情: %s", r.Request.URL.String())
+	str, err := Handler(r)
+	if err != nil {
+		return err
+	}
+	result := new(mongodb.Brand)
+	err = json.Unmarshal([]byte(str), result)
+	if err != nil {
+		log.Printf("Unmarshal error: %v,str : %v", err, str)
+		utils.WriteToFile("brand_info.json", str)
+		return err
+	}
+	//  插入详情数据
+	client := mongodb.GetMongo()
+	db := client.Database("kaogujia")
+	dao := mongodb.NewBrandDAO(db)
+	err = dao.Create(context.Background(), result)
+	if err != nil {
+		log.Printf("Create brand info error: %v", err)
+		return err
+	}
+
+	log.Printf("品牌详情处理完成: %s", r.Request.URL.String())
 	return nil
 }

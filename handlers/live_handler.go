@@ -20,6 +20,7 @@ type LiveResult struct {
 }
 
 func LiveHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) error {
+	log.Printf("处理直播列表: %s", r.Request.URL.String())
 	str, err := Handler(r)
 	if err != nil {
 		return err
@@ -43,7 +44,7 @@ func LiveHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) e
 	}
 	err = dao.BatchCreate(context.Background(), docs)
 	if err != nil {
-		log.Printf("Create author error: %v", err)
+		log.Printf("Create live error: %v", err)
 		return err
 	}
 	headers := map[string]string{
@@ -63,8 +64,10 @@ func LiveHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) e
 		"version_code":       "3.1",
 		"content-type":       "application/json",
 	}
+
+	// 处理分页
 	if result.Pagination.TotalCount > result.Pagination.Page*result.Pagination.Limit {
-		// 创建任务
+		// 创建下一页任务
 		listTask := &core.Task{
 			URL:     fmt.Sprintf("https://service.kaogujia.com/api/live/search?limit=%v&page=%v&sort_field=gmv&sort=0", result.Pagination.Limit, result.Pagination.Page+1),
 			Method:  "POST",
@@ -72,13 +75,56 @@ func LiveHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) e
 			Body:    []byte(`{"pub_time":{"min":"20250629","max":"20250705"},"keyword":"","keyword_type":1}`),
 			Handler: LiveHandler,
 			Meta: map[string]interface{}{
-				"page":     1,
-				"pageSize": 50,
+				"page":  result.Pagination.Page + 1,
+				"limit": result.Pagination.Limit,
 			},
 		}
 		d.AddTask(listTask)
 	}
-	// todo 创建info任务
 
+	// 获取直播详情数据
+	for _, item := range result.Items {
+		log.Printf("处理直播详情: ID=%s, Title=%s", item.RoomID, item.Title)
+		// 创建详情任务
+		infoTask := &core.Task{
+			URL:     fmt.Sprintf("https://service.kaogujia.com/api/live/detail/%s", item.RoomID),
+			Method:  "GET",
+			Headers: headers,
+			Handler: LiveInfoHandler,
+			Meta: map[string]interface{}{
+				"room_id": item.RoomID,
+			},
+		}
+		d.AddTask(infoTask)
+	}
+
+	log.Printf("直播列表处理完成: %s", r.Request.URL.String())
+	return nil
+}
+
+func LiveInfoHandler(r *colly.Response, acc *core.Account, d *core.TaskDispatcher) error {
+	log.Printf("处理直播详情: %s", r.Request.URL.String())
+	str, err := Handler(r)
+	if err != nil {
+		return err
+	}
+	result := new(mongodb.Live)
+	err = json.Unmarshal([]byte(str), result)
+	if err != nil {
+		log.Printf("Unmarshal error: %v,str : %v", err, str)
+		utils.WriteToFile("live_info.json", str)
+		return err
+	}
+	//  插入详情数据
+	client := mongodb.GetMongo()
+	db := client.Database("kaogujia")
+	dao := mongodb.NewLiveDAO(db)
+	err = dao.Create(context.Background(), result)
+	if err != nil {
+		log.Printf("Create live info error: %v", err)
+		return err
+	}
+
+	log.Printf("直播详情处理完成: %s", r.Request.URL.String())
 	return nil
 }
